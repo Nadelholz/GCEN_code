@@ -45,6 +45,7 @@ with open("Copci_FPKM", "r") as FPKM, open("Copci_GTF_Transcriptlinesonly", "r")
 ###GoIds
 ####using Copci.fa for this, note, I have no idea where I got this from. I think I downloaded as a mixed set from JGI, then selected anything with Copci+line below it afterwards
 ##this was using the older interproversion while I reinstalled newer version
+export LD_LIBRARY_PATH=/Volumes/scratch/anaconda/lib:$LD_LIBRARY_PATH
 ./interproscan.sh -i Copci_proteins/Copci_prots.fa --goterms
 
 
