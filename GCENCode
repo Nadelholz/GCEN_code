@@ -1,0 +1,69 @@
+######GCEN 0.6.3 
+
+####pythoncode to get us started
+###! since I want Geneids, and it is currently only MSTRGs, it is easy enough to implement so python code to change this
+####Doing something similar with the CopciFPKM files, just so can easily generate something, which I can then put into GCEN
+with open("copci_input_genome.gtf", 'r') as Original_GTF, open("Copci_GTF_Transcriptlinesonly", 'w') as ChangedGTF:
+    for Transcriptonly in Original_GTF:
+        if "transcript" in Transcriptonly.strip().split()[2]:
+            ChangedGTF.write(Transcriptonly)
+
+####code for the proteinIDs
+###adding proteins to copci_fpkm
+with open("Copci_FPKM", "r") as FPKM, open("Copci_GTF_Transcriptlinesonly", "r") as GTF, open("Copci_FPKM_proteinids","w") as output:
+    next(FPKM)
+    data_dict={}
+    for Hopefully in GTF:
+        if not Hopefully.startswith("scaffold"):
+            continue
+        mRNAfield = Hopefully.strip().split('gene_id', 1)[1]
+        mRNAfield = mRNAfield.strip().split(';')[1]
+        if "mRNA" in mRNAfield: ###as the jgiprots only present with these ones
+            MSTRG_field = Hopefully.strip().split('gene_id', 1)[1]
+            MSTRG_field = MSTRG_field.strip().split(";", 1)[0]
+            proteinname = Hopefully.strip().split("|", 1)[1]
+            proteinname = proteinname.strip().split(";")[0]
+            if MSTRG_field in data_dict:
+                if proteinname not in data_dict[MSTRG_field]:
+                    data_dict[MSTRG_field].append(proteinname)
+            else:
+                data_dict[MSTRG_field]=[proteinname]
+    quotes_gone_dict={}
+    for key, values in data_dict.items():
+        cleankey=key.strip('"')
+        cleanvalues = [(val.strip().strip('"')) for val in values]
+        quotes_gone_dict[cleankey]=cleanvalues
+    FPKM_read=FPKM.readlines()
+    for FPKM_edit in FPKM_read[1:]:
+        FPKM_COls=FPKM_edit.strip().split('\t')
+        FPKM_ID=FPKM_COls[0]
+        if FPKM_ID in quotes_gone_dict:
+            FPKMvalues=quotes_gone_dict[FPKM_ID]
+            FPKMline = "\t".join(FPKMvalues + FPKM_COls) + "\n"
+            output.write(FPKMline)
+
+###GoIds
+####using Copci.fa for this, note, I have no idea where I got this from. I think I downloaded as a mixed set from JGI, then selected anything with Copci+line below it afterwards
+##this was using the older interproversion while I reinstalled newer version
+./interproscan.sh -i Copci_proteins/Copci_prots.fa --goterms
+
+
+
+
+###Linux
+
+awk -F'\t' '{ $2=""; out=""; for (i=1; i<=NF; i++) if ($i!="") out=out $i"\t"; print out}' Copci_FPKM_proteinids > FPKMcounts_Gcen
+
+
+###GCEN
+../bin/data_norm -i FPKMcounts_Gcen -o FPKMcounts_normalised.tsv -m tmm
+../bin/data_filter -i FPKMcounts_normalised.tsv -o FPKMcounts_normalised_filter.tsv -p 0.75
+../bin/network_build -i FPKMcounts_normalised_filter.tsv -o FPKM_Copci_genecoexpr.network -m spearman -p 0.001 -c 0.8 -f -t 6
+../bin/module_identify -i FPKM_Copci_genecoexpr.network -o FPKM_Module.txt -s 0.5 -t 6
+
+
+
+
+
+
+
