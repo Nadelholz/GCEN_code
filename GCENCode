@@ -42,11 +42,26 @@ with open("Copci_FPKM", "r") as FPKM, open("Copci_GTF_Transcriptlinesonly", "r")
             FPKMline = "\t".join(FPKMvalues + FPKM_COls) + "\n"
             output.write(FPKMline)
 
+
+
+#28/07
+with open("Copci_goID_1.tsv", "r") as Copci, open("Copci_Proteins_and_GoID", "w") as output:
+    Proteins_and_GOids = set()
+    for line in Copci:
+        lines = line.strip().split()
+        ProtID = lines[0]
+        GO = lines[-1]
+        output.write(ProtID + "\t" + GO + "\n")
+
+
+
 ###GoIds
 ####using Copci.fa for this, note, I have no idea where I got this from. I think I downloaded as a mixed set from JGI, then selected anything with Copci+line below it afterwards
 ##this was using the older interproversion while I reinstalled newer version
 export LD_LIBRARY_PATH=/Volumes/scratch/anaconda/lib:$LD_LIBRARY_PATH
-./interproscan.sh -i Copci_proteins/Copci_prots.fa --goterms
+./interproscan.sh -b Copci_goID -i Copci_proteins/Copci_prots.fa --goterms ##used the older version of interpro for this
+
+
 
 
 
@@ -55,6 +70,9 @@ export LD_LIBRARY_PATH=/Volumes/scratch/anaconda/lib:$LD_LIBRARY_PATH
 
 awk -F'\t' '{ $2=""; out=""; for (i=1; i<=NF; i++) if ($i!="") out=out $i"\t"; print out}' Copci_FPKM_proteinids > FPKMcounts_Gcen
 
+#28/07
+awk 'BEGIN {FS=OFS="\t"} {gsub(/\|/, "\t", $2)}1' Copci_Proteins_and_GoID > Copci_file_touse_forGCEN
+
 
 ###GCEN
 ../bin/data_norm -i FPKMcounts_Gcen -o FPKMcounts_normalised.tsv -m tmm
@@ -62,6 +80,9 @@ awk -F'\t' '{ $2=""; out=""; for (i=1; i<=NF; i++) if ($i!="") out=out $i"\t"; p
 ../bin/network_build -i FPKMcounts_normalised_filter.tsv -o FPKM_Copci_genecoexpr.network -m spearman -p 0.001 -c 0.8 -f -t 6
 ../bin/module_identify -i FPKM_Copci_genecoexpr.network -o FPKM_Module.txt -s 0.5 -t 6
 
+./annotate -g ../sample_data/go-basic.obo -a ../sample_data/gene_go.assoc -n ../sample_data/gene_co_expr.network -o ../sample_data/network_go_annotation
+
+../bin/annotate -g go-basic.obo -a ../Copci_prot_go/Copci_file_touse_forGCEN -n../GCEN_FPKM_COPCI_ALL/FPKM_Copci_genecoexpr.network > Copci_go_network_annotation
 
 
 
