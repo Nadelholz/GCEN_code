@@ -52,6 +52,35 @@ with open("Copci_goID_1.tsv", "r") as Copci, open("Copci_Proteins_and_GoID", "w"
         ProtID = lines[0]
         GO = lines[-1]
         output.write(ProtID + "\t" + GO + "\n")
+with open("Copci_Proteins_and_GoID", 'r') as Duplicates, open("Copci_proteinsandGoid_Noduplicate", 'w') as noDuplic:
+    unique_combinations = set()
+    data_dict = {}
+    for line in Duplicates:
+        fields = line.strip().split("\t")
+        field1 = fields[0]
+        field2 = fields[1]
+        if field1 in data_dict:
+            if field2.startswith("GO"):
+                data_dict[field1]+= "|" + field2
+        else:
+                data_dict[field1] = field2
+    for key, value in data_dict.items():
+        if '|' in value:
+            values_list = value.split("|")
+
+            # Remove "-" entries from the values list
+            values_list = [v for v in values_list if v != "-"]
+
+            # Keep only unique "GO" values
+            unique_go_values = set(v for v in values_list if v.startswith("GO"))
+
+            # Join the values back with "|"
+            merged_values = "|".join(unique_go_values)
+
+            # Update the dictionary with the processed values
+            data_dict[key] = merged_values
+    for key, value in data_dict.items():
+        print(f"{key}\t{value}")
 
 
 
@@ -72,6 +101,28 @@ awk -F'\t' '{ $2=""; out=""; for (i=1; i<=NF; i++) if ($i!="") out=out $i"\t"; p
 
 #28/07
 awk 'BEGIN {FS=OFS="\t"} {gsub(/\|/, "\t", $2)}1' Copci_Proteins_and_GoID > Copci_file_touse_forGCEN
+sed -i 's/-//g' input.txt
+
+
+#modifying this the assoc code such that it has to contain the proteins present in the network
+
+awk -F'\t' '/^Copci/{
+    if (!seen[$1]) {
+        print $1 > "Test"
+        seen[$1] = 1
+    }
+    if (!seen[$2]) {
+        print $2 > "Test"
+        seen[$2] = 1
+    }
+}' FPKM_Copci_genecoexpr.network
+
+###30/07
+Appears that I have JGI|Copci and Copci|, so this may also be causing the issues.
+
+
+
+
 
 
 ###GCEN
@@ -83,6 +134,72 @@ awk 'BEGIN {FS=OFS="\t"} {gsub(/\|/, "\t", $2)}1' Copci_Proteins_and_GoID > Copc
 ./annotate -g ../sample_data/go-basic.obo -a ../sample_data/gene_go.assoc -n ../sample_data/gene_co_expr.network -o ../sample_data/network_go_annotation
 
 ../bin/annotate -g go-basic.obo -a ../Copci_prot_go/Copci_file_touse_forGCEN -n../GCEN_FPKM_COPCI_ALL/FPKM_Copci_genecoexpr.network > Copci_go_network_annotation
+
+####30/7 worked. All this in David Data
+../bin/annotate -g go-basic.obo -a ../Copci_prot_go/No_JGI_Copci_prote.assoc -n ../GCEN_FPKM_COPCI_ALL/FPKM_Copci_genecoexpr.network -o Copci_go_annotate
+
+../bin/annotate -g go-basic.obo -a ../Copci_prot_go/No_JGI_Copci_prote.assoc -m ../GCEN_FPKM_COPCI_ALL/FPKM_Module.txt -o Copci_module_go_annotation
+
+###30/7 This did not give any of the Copci proteins of interest that I have, so I will change the parameters 
+../bin/data_filter -i FPKMcounts_normalised.tsv -o FPKMcounts_normalised_filter.tsv -p 1
+../bin/network_build -i FPKMcounts_normalised_filter.tsv -o FPKM_Copci_genecoexpr.network -m spearman -p 0.05 -c 0.8 -f -t 6
+../bin/annotate -g go-basic.obo -a ../Copci_prot_go/No_JGI_Copci_prote.assoc -n ../GCEN_FPKM_COPCI_ALL/FPKM_Copci_genecoexpr.network -o Copci_go_annotate
+
+###still nothing
+../bin/network_build -i FPKMcounts_normalised_filter.tsv -o FPKM_Copci_genecoexpr.network -m spearman -p 0.05 -c 0.3 -f -t 6
+
+##still nothing, I will try with non normalised data, as you can't normalise FPKM
+../bin/network_build -i FPKMcounts_Gcen -o FPKM_Copci_genecoexpr.network -m spearman -p 0.001 -c 0.8 -f -t 6
+../bin/annotate -g go-basic.obo -a ../Copci_prot_go/No_JGI_Copci_prote.assoc -m ../GCEN_FPKM_COPCI_ALL/FPKM_Module.txt -o Copci_module_go_annotation
+../bin/module_identify -i FPKM_Copci_genecoexpr.network -o FPKM_Module.txt -s 0.5 -t 6
+../bin/annotate -g go-basic.obo -a ../Copci_prot_go/No_JGI_Copci_prote.assoc -m ../GCEN_FPKM_COPCI_ALL/FPKM_Module.txt -o Copci_module_go_annotation
+../util/network_stat -i FPKM_Copci_genecoexpr.network
+
+####used this code to search through each file, looking for if they contain the proteins of interest 
+#!/bin/bash
+
+input_file="../Prots_ofint_tofilter_for.txt"
+output_file=../"Files_to_investigate.txt"
+
+# Clear the output file before starting
+> "$output_file"
+
+# Loop through each line in input_file
+while IFS= read -r line; do
+  # Search for the line in all *.txt files and save matching filenames to the output file
+  grep -lF "$line" *.txt >> "$output_file"
+done < "$input_file"
+
+# Remove duplicate filenames from the output file (optional)
+sort -u -o "$output_file" "$output_file"
+
+
+
+
+
+
+###31/07 Linux
+
+#!/bin/bash
+
+input_file="/Volumes/archive/userdata/student_users/finndobbie/gcen-0.6.3/modules_to_filterFiles_to_investigate.txt"
+destination_dir="/Volumes/archive/userdata/student_users/finndobbie/gcen-0.6.3/modules_to_filter"
+
+# Loop through each line in input_file
+while IFS= read -r line; do
+  # Check if the file exists in the current directory
+  if [ -f "$line" ]; then
+    # Copy the file to the destination directory
+    cp "$line" "$destination_dir"
+  fi
+done < "$input_file"
+
+
+(base) bash-4.2$ grep -f proteins_ofint_in_module0.txt Filtered_coexpression_network > Filter_mustinclude_prots_ofint.txt
+
+
+ awk '$3 !~ /^-0/' Filter_mustinclude_prots_ofint.txt | awk 'BEGIN {FS=OFS="\t"} {print $1, $2}' > Removed_negative_correlations
+
 
 
 
