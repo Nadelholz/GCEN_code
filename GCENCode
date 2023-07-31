@@ -200,8 +200,50 @@ done < "$input_file"
 
  awk '$3 !~ /^-0/' Filter_mustinclude_prots_ofint.txt | awk 'BEGIN {FS=OFS="\t"} {print $1, $2}' > Removed_negative_correlations
 
+ awk '$3 > 0.7' Filter_mustinclude_prots_ofint.txt | awk 'BEGIN {FS=OFS="\t"} {print $1, $2}' > Removed_negative_correlations
+
+##31/07 Visualisation
 
 
+import networkx as nx
+import matplotlib.pyplot as plt
+
+import matplotlib as mpl
+mpl.rcParams['pdf.fonttype'] = 42
+
+network = nx.Graph()
+with open('Removed_negative_correlations', 'r') as network_file:
+    for line in network_file:
+        node_a,  node_b = line.strip().split('\t')[:2]
+        network.add_edge(node_a, node_b)
+
+f = plt.figure(figsize=(150, 150))
+f.tight_layout()
+nx.draw(network, with_labels=True, edge_color='grey', node_color='aquamarine', node_size=150)
+xl, xr = plt.xlim()
+plt.xlim(xl - 0.45, xr + 0.45)
+plt.savefig('subnetwork.pdf', format='pdf')
+
+
+-bash-4.2$ awk 'BEGIN {FS=OFS="\t"} {print $1}' Removed_negative_correlations | grep "Copci" | uniq > Test
+-bash-4.2$ awk 'BEGIN {FS=OFS="\t"} {print $2}' Removed_negative_correlations | grep "Copci" | uniq >> Test
+
+
+
+
+input_file="/Volumes/archive/userdata/student_users/finndobbie/gcen-0.6.3/modules_to_filter/Proteins_tofilter_GOannotation_for_asin_module0"
+destination_dir="/Volumes/archive/userdata/student_users/finndobbie/gcen-0.6.3/modules_to_filter/go_annotation_counts_python_module0_proteins"
+source_directory="/Volumes/archive/userdata/student_users/finndobbie/gcen-0.6.3/David_data/Copci_go_annotate/"
+
+while IFS= read -r line; do
+  # Check if the file exists in the source directory
+  if [ -f "$source_directory/$line" ]; then
+    # Copy the file to the destination directory
+    cp "$source_directory/$line" "$destination_dir"
+  else
+    echo "File not present: $line"
+  fi
+done < "$input_file"
 
 
 
