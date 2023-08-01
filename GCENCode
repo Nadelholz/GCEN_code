@@ -182,7 +182,7 @@ sort -u -o "$output_file" "$output_file"
 
 #!/bin/bash
 
-input_file="/Volumes/archive/userdata/student_users/finndobbie/gcen-0.6.3/modules_to_filterFiles_to_investigate.txt"
+input_file="/Volumes/archive/userdata/student_users/finndobbie/gcen-0.6.3/modules_to_filter/Files_to_investigate.txt"
 destination_dir="/Volumes/archive/userdata/student_users/finndobbie/gcen-0.6.3/modules_to_filter"
 
 # Loop through each line in input_file
@@ -245,6 +245,146 @@ while IFS= read -r line; do
   fi
 done < "$input_file"
 
+####1/08/23
 
+../bin/data_norm -i Countsdata_Copci_GCEN -o counts_normalised.tsv -m deseq
+../bin/data_filter -i counts_normalised.tsv -o counts_normalised_filter.tsv -p 0.75
+../bin/network_build -i counts_normalised_filter.tsv -o Copci_genecoexpr.network -m spearman -p 0.001 -c 0.8 -f -t 6
+../bin/module_identify -i Copci_genecoexpr.network -o Module.txt -s 0.5 -t 6
+
+
+../bin/annotate -g go-basic.obo -a ../Copci_prot_go/No_JGI_Copci_prote.assoc -n ../Count_data/Copci_genecoexpr.network -o Copci_go_annotate
+
+../bin/annotate -g go-basic.obo -a ../Copci_prot_go/No_JGI_Copci_prote.assoc -m ../Count_data/Module.txt -o Countdata_Copci_module_go_annotation
+
+
+#!/bin/bash
+
+input_file="/Volumes/archive/userdata/student_users/finndobbie/gcen-0.6.3/Count_data/Prots_ofint_tofilter_for.txt"
+output_file="/Volumes/archive/userdata/student_users/finndobbie/gcen-0.6.3/Count_data/Modules_to_investigate.txt"
+
+# Clear the output file before starting
+> "$output_file"
+
+# Loop through each line in input_file
+while IFS= read -r line; do
+  # Search for the line in all *.txt files and save matching filenames to the output file
+  grep -lF "$line" *.txt >> "$output_file"
+done < "$input_file"
+
+# Remove duplicate filenames from the output file (optional)
+sort -u -o "$output_file" "$output_file"
+
+
+#!/bin/bash
+
+input_file="/Volumes/archive/userdata/student_users/finndobbie/gcen-0.6.3/Count_data/Modules_to_investigate.txt"
+destination_dir="/Volumes/archive/userdata/student_users/finndobbie/gcen-0.6.3/Count_data/"
+
+# Loop through each line in input_file
+while IFS= read -r line; do
+  # Check if the file exists in the current directory
+  if [ -f "$line" ]; then
+    # Copy the file to the destination directory
+    cp "$line" "$destination_dir"
+  fi
+done < "$input_file"
+
+##now filtering the modules
+
+
+grep -f module_51.txt Copci_genecoexpr.network > Network_filteredfor_mod51.txt
+
+grep -f Prots_ofint_tofilter_for.txt Network_filteredfor_mod51.txt> Network_mustalso_haveProtsofint.txt
+
+##positive correlation 
+awk '$3 !~ /^-0/' Network_mustalso_haveProtsofint.txt | awk 'BEGIN {FS=OFS="\t"} {print $1, $2}' > Countdata_Removed_negative_correlations
+
+##negative 
+awk '$3 ~ /^-0/' Network_mustalso_haveProtsofint.txt | awk 'BEGIN {FS=OFS="\t"} {print $1, $2}' > Countdata_negative_correlations
+
+
+
+
+
+
+
+#GCEN visualisation
+
+##1/08
+
+
+
+
+
+
+
+
+
+
+
+
+###this here works, but none of the proteins I had, in my modules had a GO annotation
+
+###note had to modify this due to append to working
+import os
+import pandas as pd
+from collections import Counter
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+###this acts as a function
+def read_go(go_annotation_file):
+    df = pd.read_csv(go_annotation_file, delimiter="\t")
+    df = df[df['enrichment'] == 'e'][['name', 'name_space', 'p_val']]
+
+    df2 = pd.DataFrame(columns=["name", "name_space", "p_val"])
+    for name_space in ['biological_process', 'molecular_function', 'cellular_component']:
+        df_ = df[df['name_space'] == name_space]
+        df_ = df_.sort_values(by='p_val')
+        if df_.shape[0] > 10:
+            df_ = df_.iloc[0:10]
+        df2 = pd.concat([df2, df_], ignore_index=True)
+    return df2
+
+df = pd.DataFrame(columns=["name", "name_space", "p_val"])
+for go_annotation_file in os.listdir('network_go_annotation'):
+    single_df = read_go('network_go_annotation/' + go_annotation_file)
+    df = pd.concat([df, single_df], ignore_index=True)
+
+df_plot = pd.DataFrame(columns=['name', 'counts', 'name_space'])
+for name_space in ['biological_process', 'molecular_function', 'cellular_component']:
+    counter = Counter(df[df["name_space"] == name_space]["name"])
+    df_ = pd.DataFrame.from_dict(counter, orient='index').reset_index()
+    df_.columns = ['name', 'counts']
+    df_ = df_.sort_values(by='counts', ascending=False)
+    if df_.shape[0] > 10:
+        df_ = df_.iloc[0:10]
+    df_['name_space'] = name_space
+    df_plot = pd.concat([df_plot, df_], ignore_index=True)
+
+fig, ax = plt.subplots()
+fig.set_size_inches(8, 8)
+sns_plot = sns.barplot(x="counts", y="name", hue="name_space", data=df_plot)
+ax.set(ylabel="", xlabel="counts (top 10)")
+sns.despine(left=True, bottom=True)
+plt.savefig('go_annotation_counts.pdf', format='pdf', bbox_inches='tight')
+
+
+#####Stringtie
+awk '/^>/ {sub(/\|[^|]*$/, "", $0); print} !/^>/' Copci_AmutBmut1_GeneCatalog_proteins_20130522.aa.fasta > Test
+awk '/^>/ {sub(/\|[^|]*$/, "", $0); gsub(/\*/, "", $0); print} !/^>/' Copci_AmutBmut1_GeneCatalog_proteins_20130522
+
+sed -i 's/\*//g' Test.fa
+sed -i '/^>/ s/^>jgi/>/' Test.fa
+
+##1/08 enrichment, to test the upregulated genes, I will be using the downregulated genes as background
+-bash-4.2$ awk {'print $2}' Countdata_Removed_negative_correlations | sort | uniq > Enrichment_1
+-bash-4.2$ awk {'print $1}' Countdata_Removed_negative_correlations | sort | uniq >> Enrichment_1
+
+
+enrich -e ../sample_data/enrichment_gene.list -b ../sample_data/background_gene.list -g ../sample_data/go-basic.obo -a ../sample_data/gene_go.assoc -p 0.05 -o ../sample_data/enrichment.go
+
+enrich -e Enrichment.list -b Background.list -g ../sample_data/go-basic.obo -a ../sample_data/gene_go.assoc -p 0.05 -o ../sample_data/enrichment.go
 
 
