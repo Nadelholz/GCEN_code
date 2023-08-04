@@ -383,8 +383,7 @@ sed -i '/^>/ s/^>jgi/>/' Test.fa
 -bash-4.2$ awk {'print $1}' Countdata_Removed_negative_correlations | sort | uniq >> Enrichment_1
 
 
-enrich -e ../sample_data/enrichment_gene.list -b ../sample_data/background_gene.list -g ../sample_data/go-basic.obo -a ../sample_data/gene_go.assoc -p 0.05 -o ../sample_data/enrichment.go
 
-enrich -e Enrichment.list -b Background.list -g ../sample_data/go-basic.obo -a ../sample_data/gene_go.assoc -p 0.05 -o ../sample_data/enrichment.go
-
+../../util/enrich -e Enrichment.list  -b Background.list -g ../../David_data/go-basic.obo -a ../../Copci_prot_go/No_JGI_Copci_prote.assoc -p 0.05 -o enrichment.go
+../../util/enrich -e Background.list  -b  Enrichment.list -g ../../David_data/go-basic.obo -a ../../Copci_prot_go/No_JGI_Copci_prote.assoc -p 0.05 -o down_enrichment.go
 
