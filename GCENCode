@@ -97,12 +97,10 @@ with open("Copci_JGI_and_2021_joined", "r") as Copci_2021_JGi, open("Row_bind_an
             annotation = "".join(Copci_2021_interproannotations[Field3])
         elif Field3 in JGI_copci_interproannotations:
             annotation = "".join(JGI_copci_interproannotations[Field3])
-
-        # Move the values to the right of the insertion point to the next column
-        for i in range(4, len(fields)):
-            fields[i], annotation = annotation, fields[i]
-
         fields.insert(3, annotation)
+        # Move the values to the right of the insertion point to the next column
+
+
 
         # Join the fields back together and write to the output file
         output_line = "\t".join(fields)
