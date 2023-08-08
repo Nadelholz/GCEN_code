@@ -1,389 +1,109 @@
-######GCEN 0.6.3 
+with open("Copci_JGI_and_2021_joined", "r") as Copci_2021_JGi, open("Copci_prots.fa.tsv", 'r') as JGI_Interpro, open("Copci_2021_CC2G.fa.tsv", 'r') as Copci_2021:
+    Copci_2021_proteins=set()
+    JGI_Copci_proteins=set()
+    Copci_2021_interproannotations={}
+    JGI_copci_interproannotations={}
+    for CC2021_prot in Copci_2021_JGi:
+        Field1=CC2021_prot.strip().split()[0]
+        Field3=CC2021_prot.strip().split()[2]
 
-####pythoncode to get us started
-###! since I want Geneids, and it is currently only MSTRGs, it is easy enough to implement so python code to change this
-####Doing something similar with the CopciFPKM files, just so can easily generate something, which I can then put into GCEN
-with open("copci_input_genome.gtf", 'r') as Original_GTF, open("Copci_GTF_Transcriptlinesonly", 'w') as ChangedGTF:
-    for Transcriptonly in Original_GTF:
-        if "transcript" in Transcriptonly.strip().split()[2]:
-            ChangedGTF.write(Transcriptonly)
+        if "CC2G" in Field1:
+            Copci_2021_proteins.add(Field1)
+        elif "CC2G" in Field3:
+            Copci_2021_proteins.add(Field3)
 
-####code for the proteinIDs
-###adding proteins to copci_fpkm
-with open("Copci_FPKM", "r") as FPKM, open("Copci_GTF_Transcriptlinesonly", "r") as GTF, open("Copci_FPKM_proteinids","w") as output:
-    next(FPKM)
-    data_dict={}
-    for Hopefully in GTF:
-        if not Hopefully.startswith("scaffold"):
-            continue
-        mRNAfield = Hopefully.strip().split('gene_id', 1)[1]
-        mRNAfield = mRNAfield.strip().split(';')[1]
-        if "mRNA" in mRNAfield: ###as the jgiprots only present with these ones
-            MSTRG_field = Hopefully.strip().split('gene_id', 1)[1]
-            MSTRG_field = MSTRG_field.strip().split(";", 1)[0]
-            proteinname = Hopefully.strip().split("|", 1)[1]
-            proteinname = proteinname.strip().split(";")[0]
-            if MSTRG_field in data_dict:
-                if proteinname not in data_dict[MSTRG_field]:
-                    data_dict[MSTRG_field].append(proteinname)
-            else:
-                data_dict[MSTRG_field]=[proteinname]
-    quotes_gone_dict={}
-    for key, values in data_dict.items():
-        cleankey=key.strip('"')
-        cleanvalues = [(val.strip().strip('"')) for val in values]
-        quotes_gone_dict[cleankey]=cleanvalues
-    FPKM_read=FPKM.readlines()
-    for FPKM_edit in FPKM_read[1:]:
-        FPKM_COls=FPKM_edit.strip().split('\t')
-        FPKM_ID=FPKM_COls[0]
-        if FPKM_ID in quotes_gone_dict:
-            FPKMvalues=quotes_gone_dict[FPKM_ID]
-            FPKMline = "\t".join(FPKMvalues + FPKM_COls) + "\n"
-            output.write(FPKMline)
+        if "jgi" in Field1:
+            JGI_Copci_proteins.add(Field1)
+        elif "jgi" in Field3:
+            JGI_Copci_proteins.add(Field3)
+    #now to create a dictionary, with the following parameters
+    #make a dictionary of every protein in the 2021 file
+    #make a dictionary of every protein in the 2021 file, key is protein name, value is
+    for Dictionary_2021 in Copci_2021:
+        fields = Dictionary_2021.strip().split()
+        Field1 = fields[0]
+        if "IPR" in Dictionary_2021:
+            Fields_second_last = Dictionary_2021.strip().split("IPR")[1]
+            Fields_second_last_1 = Fields_second_last.strip().split('\t', 1)[1]
+            Fields_second_last_2 = '\t'.join(Fields_second_last_1.split('\t')[:-1])
+            Fields_second_last_2 = '-'.join(Fields_second_last_2.split())
+            if any(Name in Field1 for Name in Copci_2021_proteins):
+                if Field1 not in Copci_2021_interproannotations:
+                    Copci_2021_interproannotations[Field1] = [Fields_second_last_2]
+                else:
+                    Copci_2021_interproannotations[Field1].append(Fields_second_last_2)
+    for Dictionary_JGI in JGI_Interpro:
+        fields = Dictionary_JGI.strip().split()
+        Field1 = fields[0]
+        if "IPR" in Dictionary_JGI:
+            Fields_second_last = Dictionary_JGI.strip().split("IPR")[1]
+            Fields_second_last_1 = Fields_second_last.strip().split('\t', 1)[1]
+            Fields_second_last_2 = '\t'.join(Fields_second_last_1.split('\t')[:-1])
+            Fields_second_last_2 = '-'.join(Fields_second_last_2.split())
+            if any(Name in Field1 for Name in JGI_Copci_proteins):
+                if Field1 not in Copci_2021_interproannotations:
+                    JGI_copci_interproannotations[Field1] = Fields_second_last_2
+                else:
+                    JGI_copci_interproannotations[Field1].append(Fields_second_last_2)
+with open("Copci_JGI_and_2021_joined", "r") as Copci_2021_JGi, open("Row_bind_annotationsadded", 'w') as output:
+    headers = Copci_2021_JGi.readline().strip().split("\t")
+    headers.insert(0, "Annotation")
+    output_headers = "\t".join(headers)
+    output.write(output_headers + "\n")  # Write the modified headers to the output file
 
+    # Skip the first line of the input file (header line)
+    next(Copci_2021_JGi)
 
-
-#28/07
-with open("Copci_goID_1.tsv", "r") as Copci, open("Copci_Proteins_and_GoID", "w") as output:
-    Proteins_and_GOids = set()
-    for line in Copci:
-        lines = line.strip().split()
-        ProtID = lines[0]
-        GO = lines[-1]
-        output.write(ProtID + "\t" + GO + "\n")
-with open("Copci_Proteins_and_GoID", 'r') as Duplicates, open("Copci_proteinsandGoid_Noduplicate", 'w') as noDuplic:
-    unique_combinations = set()
-    data_dict = {}
-    for line in Duplicates:
+    for line in Copci_2021_JGi:
         fields = line.strip().split("\t")
-        field1 = fields[0]
-        field2 = fields[1]
-        if field1 in data_dict:
-            if field2.startswith("GO"):
-                data_dict[field1]+= "|" + field2
-        else:
-                data_dict[field1] = field2
-    for key, value in data_dict.items():
-        if '|' in value:
-            values_list = value.split("|")
-
-            # Remove "-" entries from the values list
-            values_list = [v for v in values_list if v != "-"]
-
-            # Keep only unique "GO" values
-            unique_go_values = set(v for v in values_list if v.startswith("GO"))
-
-            # Join the values back with "|"
-            merged_values = "|".join(unique_go_values)
-
-            # Update the dictionary with the processed values
-            data_dict[key] = merged_values
-    for key, value in data_dict.items():
-        print(f"{key}\t{value}")
-
-
-
-###GoIds
-####using Copci.fa for this, note, I have no idea where I got this from. I think I downloaded as a mixed set from JGI, then selected anything with Copci+line below it afterwards
-##this was using the older interproversion while I reinstalled newer version
-export LD_LIBRARY_PATH=/Volumes/scratch/anaconda/lib:$LD_LIBRARY_PATH
-./interproscan.sh -b Copci_goID -i Copci_proteins/Copci_prots.fa --goterms ##used the older version of interpro for this
-
-
-
-
-
-
-###Linux
-
-awk -F'\t' '{ $2=""; out=""; for (i=1; i<=NF; i++) if ($i!="") out=out $i"\t"; print out}' Copci_FPKM_proteinids > FPKMcounts_Gcen
-
-#28/07
-awk 'BEGIN {FS=OFS="\t"} {gsub(/\|/, "\t", $2)}1' Copci_Proteins_and_GoID > Copci_file_touse_forGCEN
-sed -i 's/-//g' input.txt
-
-
-#modifying this the assoc code such that it has to contain the proteins present in the network
-
-awk -F'\t' '/^Copci/{
-    if (!seen[$1]) {
-        print $1 > "Test"
-        seen[$1] = 1
-    }
-    if (!seen[$2]) {
-        print $2 > "Test"
-        seen[$2] = 1
-    }
-}' FPKM_Copci_genecoexpr.network
-
-###30/07
-Appears that I have JGI|Copci and Copci|, so this may also be causing the issues.
-
-
-
-
-
-
-###GCEN
-../bin/data_norm -i FPKMcounts_Gcen -o FPKMcounts_normalised.tsv -m tmm
-../bin/data_filter -i FPKMcounts_normalised.tsv -o FPKMcounts_normalised_filter.tsv -p 0.75
-../bin/network_build -i FPKMcounts_normalised_filter.tsv -o FPKM_Copci_genecoexpr.network -m spearman -p 0.001 -c 0.8 -f -t 6
-../bin/module_identify -i FPKM_Copci_genecoexpr.network -o FPKM_Module.txt -s 0.5 -t 6
-
-./annotate -g ../sample_data/go-basic.obo -a ../sample_data/gene_go.assoc -n ../sample_data/gene_co_expr.network -o ../sample_data/network_go_annotation
-
-../bin/annotate -g go-basic.obo -a ../Copci_prot_go/Copci_file_touse_forGCEN -n../GCEN_FPKM_COPCI_ALL/FPKM_Copci_genecoexpr.network > Copci_go_network_annotation
-
-####30/7 worked. All this in David Data
-../bin/annotate -g go-basic.obo -a ../Copci_prot_go/No_JGI_Copci_prote.assoc -n ../GCEN_FPKM_COPCI_ALL/FPKM_Copci_genecoexpr.network -o Copci_go_annotate
-
-../bin/annotate -g go-basic.obo -a ../Copci_prot_go/No_JGI_Copci_prote.assoc -m ../GCEN_FPKM_COPCI_ALL/FPKM_Module.txt -o Copci_module_go_annotation
-
-###30/7 This did not give any of the Copci proteins of interest that I have, so I will change the parameters 
-../bin/data_filter -i FPKMcounts_normalised.tsv -o FPKMcounts_normalised_filter.tsv -p 1
-../bin/network_build -i FPKMcounts_normalised_filter.tsv -o FPKM_Copci_genecoexpr.network -m spearman -p 0.05 -c 0.8 -f -t 6
-../bin/annotate -g go-basic.obo -a ../Copci_prot_go/No_JGI_Copci_prote.assoc -n ../GCEN_FPKM_COPCI_ALL/FPKM_Copci_genecoexpr.network -o Copci_go_annotate
-
-###still nothing
-../bin/network_build -i FPKMcounts_normalised_filter.tsv -o FPKM_Copci_genecoexpr.network -m spearman -p 0.05 -c 0.3 -f -t 6
-
-##still nothing, I will try with non normalised data, as you can't normalise FPKM
-../bin/network_build -i FPKMcounts_Gcen -o FPKM_Copci_genecoexpr.network -m spearman -p 0.001 -c 0.8 -f -t 6
-../bin/annotate -g go-basic.obo -a ../Copci_prot_go/No_JGI_Copci_prote.assoc -m ../GCEN_FPKM_COPCI_ALL/FPKM_Module.txt -o Copci_module_go_annotation
-../bin/module_identify -i FPKM_Copci_genecoexpr.network -o FPKM_Module.txt -s 0.5 -t 6
-../bin/annotate -g go-basic.obo -a ../Copci_prot_go/No_JGI_Copci_prote.assoc -m ../GCEN_FPKM_COPCI_ALL/FPKM_Module.txt -o Copci_module_go_annotation
-../util/network_stat -i FPKM_Copci_genecoexpr.network
-
-####used this code to search through each file, looking for if they contain the proteins of interest 
-#!/bin/bash
-
-input_file="../Prots_ofint_tofilter_for.txt"
-output_file=../"Files_to_investigate.txt"
-
-# Clear the output file before starting
-> "$output_file"
-
-# Loop through each line in input_file
-while IFS= read -r line; do
-  # Search for the line in all *.txt files and save matching filenames to the output file
-  grep -lF "$line" *.txt >> "$output_file"
-done < "$input_file"
-
-# Remove duplicate filenames from the output file (optional)
-sort -u -o "$output_file" "$output_file"
-
-
-
-
-
-
-###31/07 Linux
-
-#!/bin/bash
-
-input_file="/Volumes/archive/userdata/student_users/finndobbie/gcen-0.6.3/modules_to_filter/Files_to_investigate.txt"
-destination_dir="/Volumes/archive/userdata/student_users/finndobbie/gcen-0.6.3/modules_to_filter"
-
-# Loop through each line in input_file
-while IFS= read -r line; do
-  # Check if the file exists in the current directory
-  if [ -f "$line" ]; then
-    # Copy the file to the destination directory
-    cp "$line" "$destination_dir"
-  fi
-done < "$input_file"
-
-
-(base) bash-4.2$ grep -f proteins_ofint_in_module0.txt Filtered_coexpression_network > Filter_mustinclude_prots_ofint.txt
-
-
- awk '$3 !~ /^-0/' Filter_mustinclude_prots_ofint.txt | awk 'BEGIN {FS=OFS="\t"} {print $1, $2}' > Removed_negative_correlations
-
- awk '$3 > 0.7' Filter_mustinclude_prots_ofint.txt | awk 'BEGIN {FS=OFS="\t"} {print $1, $2}' > Removed_negative_correlations
-
-##31/07 Visualisation
-
-
-import networkx as nx
-import matplotlib.pyplot as plt
-
-import matplotlib as mpl
-mpl.rcParams['pdf.fonttype'] = 42
-
-network = nx.Graph()
-with open('Removed_negative_correlations', 'r') as network_file:
-    for line in network_file:
-        node_a,  node_b = line.strip().split('\t')[:2]
-        network.add_edge(node_a, node_b)
-
-f = plt.figure(figsize=(150, 150))
-f.tight_layout()
-nx.draw(network, with_labels=True, edge_color='grey', node_color='aquamarine', node_size=150)
-xl, xr = plt.xlim()
-plt.xlim(xl - 0.45, xr + 0.45)
-plt.savefig('subnetwork.pdf', format='pdf')
-
-
--bash-4.2$ awk 'BEGIN {FS=OFS="\t"} {print $1}' Removed_negative_correlations | grep "Copci" | uniq > Test
--bash-4.2$ awk 'BEGIN {FS=OFS="\t"} {print $2}' Removed_negative_correlations | grep "Copci" | uniq >> Test
-
-
-
-
-input_file="/Volumes/archive/userdata/student_users/finndobbie/gcen-0.6.3/modules_to_filter/Proteins_tofilter_GOannotation_for_asin_module0"
-destination_dir="/Volumes/archive/userdata/student_users/finndobbie/gcen-0.6.3/modules_to_filter/go_annotation_counts_python_module0_proteins"
-source_directory="/Volumes/archive/userdata/student_users/finndobbie/gcen-0.6.3/David_data/Copci_go_annotate/"
-
-while IFS= read -r line; do
-  # Check if the file exists in the source directory
-  if [ -f "$source_directory/$line" ]; then
-    # Copy the file to the destination directory
-    cp "$source_directory/$line" "$destination_dir"
-  else
-    echo "File not present: $line"
-  fi
-done < "$input_file"
-
-####1/08/23
-
-../bin/data_norm -i Countsdata_Copci_GCEN -o counts_normalised.tsv -m deseq
-../bin/data_filter -i counts_normalised.tsv -o counts_normalised_filter.tsv -p 0.75
-../bin/network_build -i counts_normalised_filter.tsv -o Copci_genecoexpr.network -m spearman -p 0.001 -c 0.8 -f -t 6
-../bin/module_identify -i Copci_genecoexpr.network -o Module.txt -s 0.5 -t 6
-
-
-../bin/annotate -g go-basic.obo -a ../Copci_prot_go/No_JGI_Copci_prote.assoc -n ../Count_data/Copci_genecoexpr.network -o Copci_go_annotate
-
-../bin/annotate -g go-basic.obo -a ../Copci_prot_go/No_JGI_Copci_prote.assoc -m ../Count_data/Module.txt -o Countdata_Copci_module_go_annotation
-
-
-#!/bin/bash
-
-input_file="/Volumes/archive/userdata/student_users/finndobbie/gcen-0.6.3/Count_data/Prots_ofint_tofilter_for.txt"
-output_file="/Volumes/archive/userdata/student_users/finndobbie/gcen-0.6.3/Count_data/Modules_to_investigate.txt"
-
-# Clear the output file before starting
-> "$output_file"
-
-# Loop through each line in input_file
-while IFS= read -r line; do
-  # Search for the line in all *.txt files and save matching filenames to the output file
-  grep -lF "$line" *.txt >> "$output_file"
-done < "$input_file"
-
-# Remove duplicate filenames from the output file (optional)
-sort -u -o "$output_file" "$output_file"
-
-
-#!/bin/bash
-
-input_file="/Volumes/archive/userdata/student_users/finndobbie/gcen-0.6.3/Count_data/Modules_to_investigate.txt"
-destination_dir="/Volumes/archive/userdata/student_users/finndobbie/gcen-0.6.3/Count_data/"
-
-# Loop through each line in input_file
-while IFS= read -r line; do
-  # Check if the file exists in the current directory
-  if [ -f "$line" ]; then
-    # Copy the file to the destination directory
-    cp "$line" "$destination_dir"
-  fi
-done < "$input_file"
-
-##now filtering the modules
-
-
-grep -f module_51.txt Copci_genecoexpr.network > Network_filteredfor_mod51.txt
-
-grep -f Prots_ofint_tofilter_for.txt Network_filteredfor_mod51.txt> Network_mustalso_haveProtsofint.txt
-
-##positive correlation 
-awk '$3 !~ /^-0/' Network_mustalso_haveProtsofint.txt | awk 'BEGIN {FS=OFS="\t"} {print $1, $2}' > Countdata_Removed_negative_correlations
-
-##negative 
-awk '$3 ~ /^-0/' Network_mustalso_haveProtsofint.txt | awk 'BEGIN {FS=OFS="\t"} {print $1, $2}' > Countdata_negative_correlations
-
-
-
-
-
-
-
-#GCEN visualisation
-
-##1/08
-
-
-
-
-
-
-
-
-
-
-
-
-###this here works, but none of the proteins I had, in my modules had a GO annotation
-
-###note had to modify this due to append to working
-import os
-import pandas as pd
-from collections import Counter
-import seaborn as sns
-import matplotlib.pyplot as plt
-
-###this acts as a function
-def read_go(go_annotation_file):
-    df = pd.read_csv(go_annotation_file, delimiter="\t")
-    df = df[df['enrichment'] == 'e'][['name', 'name_space', 'p_val']]
-
-    df2 = pd.DataFrame(columns=["name", "name_space", "p_val"])
-    for name_space in ['biological_process', 'molecular_function', 'cellular_component']:
-        df_ = df[df['name_space'] == name_space]
-        df_ = df_.sort_values(by='p_val')
-        if df_.shape[0] > 10:
-            df_ = df_.iloc[0:10]
-        df2 = pd.concat([df2, df_], ignore_index=True)
-    return df2
-
-df = pd.DataFrame(columns=["name", "name_space", "p_val"])
-for go_annotation_file in os.listdir('network_go_annotation'):
-    single_df = read_go('network_go_annotation/' + go_annotation_file)
-    df = pd.concat([df, single_df], ignore_index=True)
-
-df_plot = pd.DataFrame(columns=['name', 'counts', 'name_space'])
-for name_space in ['biological_process', 'molecular_function', 'cellular_component']:
-    counter = Counter(df[df["name_space"] == name_space]["name"])
-    df_ = pd.DataFrame.from_dict(counter, orient='index').reset_index()
-    df_.columns = ['name', 'counts']
-    df_ = df_.sort_values(by='counts', ascending=False)
-    if df_.shape[0] > 10:
-        df_ = df_.iloc[0:10]
-    df_['name_space'] = name_space
-    df_plot = pd.concat([df_plot, df_], ignore_index=True)
-
-fig, ax = plt.subplots()
-fig.set_size_inches(8, 8)
-sns_plot = sns.barplot(x="counts", y="name", hue="name_space", data=df_plot)
-ax.set(ylabel="", xlabel="counts (top 10)")
-sns.despine(left=True, bottom=True)
-plt.savefig('go_annotation_counts.pdf', format='pdf', bbox_inches='tight')
-
-
-#####Stringtie
-awk '/^>/ {sub(/\|[^|]*$/, "", $0); print} !/^>/' Copci_AmutBmut1_GeneCatalog_proteins_20130522.aa.fasta > Test
-awk '/^>/ {sub(/\|[^|]*$/, "", $0); gsub(/\*/, "", $0); print} !/^>/' Copci_AmutBmut1_GeneCatalog_proteins_20130522
-
-sed -i 's/\*//g' Test.fa
-sed -i '/^>/ s/^>jgi/>/' Test.fa
-
-##1/08 enrichment, to test the upregulated genes, I will be using the downregulated genes as background
--bash-4.2$ awk {'print $2}' Countdata_Removed_negative_correlations | sort | uniq > Enrichment_1
--bash-4.2$ awk {'print $1}' Countdata_Removed_negative_correlations | sort | uniq >> Enrichment_1
-
-
-
-../../util/enrich -e Enrichment.list  -b Background.list -g ../../David_data/go-basic.obo -a ../../Copci_prot_go/No_JGI_Copci_prote.assoc -p 0.05 -o enrichment.go
-../../util/enrich -e Background.list  -b  Enrichment.list -g ../../David_data/go-basic.obo -a ../../Copci_prot_go/No_JGI_Copci_prote.assoc -p 0.05 -o down_enrichment.go
-
+        Field1 = fields[0]
+        annotation = ""
+        if Field1 in Copci_2021_interproannotations:
+            annotation = "".join(Copci_2021_interproannotations[Field1])
+        elif Field1 in JGI_copci_interproannotations:
+            annotation = "".join(JGI_copci_interproannotations[Field1])
+        fields.insert(0, annotation)
+
+        # Join the fields back together and write to the output file
+        output_line = "\t".join(fields)
+        output.write(output_line + "\n")
+
+with open("Copci_JGI_and_2021_joined", "r") as Copci_2021_JGi, open("Row_bind_annotationsadded_orthologuesaswell", 'w') as output:
+    headers = Copci_2021_JGi.readline().strip().split("\t")
+    headers.insert(0, "Annotation")
+    headers.insert(3, "Orthologue_annotation")  # Insert the new column name at the 4th position
+    output_headers = "\t".join(headers)
+    output.write(output_headers + "\n")  # Write the modified headers to the output file
+
+    # Skip the first line of the input file (header line)
+    next(Copci_2021_JGi)
+
+    for line in Copci_2021_JGi:
+        fields = line.strip().split("\t")
+        Field1 = fields[0]
+        Field3 = fields[2]
+        annotation = ""
+
+        # Populate the "Annotation" column
+        if Field1 in Copci_2021_interproannotations:
+            annotation = "".join(Copci_2021_interproannotations[Field1])
+        elif Field1 in JGI_copci_interproannotations:
+            annotation = "".join(JGI_copci_interproannotations[Field1])
+        fields.insert(0, annotation)
+
+        # Populate the "Orthologue_annotation" column
+        annotation = ""
+        if Field3 in Copci_2021_interproannotations:
+            annotation = "".join(Copci_2021_interproannotations[Field3])
+        elif Field3 in JGI_copci_interproannotations:
+            annotation = "".join(JGI_copci_interproannotations[Field3])
+
+        # Move the values to the right of the insertion point to the next column
+        for i in range(4, len(fields)):
+            fields[i], annotation = annotation, fields[i]
+
+        fields.insert(3, annotation)
+
+        # Join the fields back together and write to the output file
+        output_line = "\t".join(fields)
+        output.write(output_line + "\n")
