@@ -105,3 +105,135 @@ with open("Copci_JGI_and_2021_joined", "r") as Copci_2021_JGi, open("Row_bind_an
         # Join the fields back together and write to the output file
         output_line = "\t".join(fields)
         output.write(output_line + "\n")
+
+
+####Ok, redoing this, this time I have joined the proteins, with same MSTRG ID with a ;, and not duplicated them. This way I can keep track of everything that is though to be an isoform, as well 
+
+
+#14/08/23
+
+with open("Copci_GTF_and_countdata/JGI_Copci.gtf", 'r') as JGI_GTF, open("Copci_GTF_and_countdata/Copci_2021.gtf", 'r') as CC_21_gtf:
+    JGI_Dict={}
+    CC21_Dict={}
+    for JGI_GF in JGI_GTF:
+        Transcript_field=JGI_GF.strip().split()[2]
+        if "transcript" in Transcript_field:
+            MSTRG_ID=JGI_GF.strip().split()[9]
+            if "jgi" in JGI_GF:
+                JGI_ID=JGI_GF.strip().split("jgi.p|")[1]
+                JGI_ID=JGI_ID.strip().split(";")[0]
+                if MSTRG_ID in JGI_Dict:
+                    if JGI_ID not in JGI_Dict[MSTRG_ID]:
+                        JGI_Dict[MSTRG_ID].append(JGI_ID)
+                else:
+                    JGI_Dict[MSTRG_ID]=[JGI_ID]
+    for CC_2021_GTF in CC_21_gtf:
+        Transcript_field_2021 = CC_2021_GTF.strip().split()[2]
+        if "transcript" in Transcript_field_2021:
+            MSTRG_ID_2021 = CC_2021_GTF.strip().split()[9]
+            if "rna-gnl" in CC_2021_GTF:
+                CC_ID = CC_2021_GTF.strip().split("gene-")[1]
+                CC_ID=CC_ID.strip().split(";")[0]
+
+                if MSTRG_ID_2021 in CC21_Dict:
+                    if CC_ID not in CC21_Dict[MSTRG_ID_2021]:
+                        CC21_Dict[MSTRG_ID_2021].append(CC_ID)
+                else:
+                    CC21_Dict[MSTRG_ID_2021]=[CC_ID]
+    Copci_2021_quotesgone_dict={}
+    for key_21, values_21 in CC21_Dict.items():
+        Cleankey_21 = key_21.replace('"', '')  # Remove ;" from the key
+        Cleankey_21 = Cleankey_21.replace(";", '')
+        CleanValues_21 = [val_21.replace('"', '') for val_21 in values_21]  # Remove " from each value
+        Copci_2021_quotesgone_dict[Cleankey_21] = CleanValues_21
+    JGI_Quotesgone_dict={}
+    for key_jgi, values_jgi in JGI_Dict.items():
+        Cleankey_JGI = key_jgi.replace('"', '')
+        Cleankey_JGI = Cleankey_JGI.replace(";", '')  # Remove ;" from the key
+        CleanValues_JGI = [values_jgi.replace('"', '') for values_jgi in values_jgi]  # Remove " from each value
+        JGI_Quotesgone_dict[Cleankey_JGI] = CleanValues_JGI
+
+with open("Copci_GTF_and_countdata/JGI_Copci_count_data.txt", 'r') as JGI_CC_Counts,  open("Copci_GTF_and_countdata/Copci_2021_genecount.txt", 'r') as CC_21_count, \
+    open("Copci_JGI_Countdata_duplicates", 'w') as Copci_JGI_duplicated, open("Copc_2021_Countdata_duplicate", 'w') as Copci_2021_duplicated:
+    JGI_Count_header=JGI_CC_Counts.readline()
+    CC_JGI_lines=JGI_CC_Counts.readlines()
+    Copci_JGI_duplicated.write("Protein_id" + "\t" + JGI_Count_header)
+    for CC_JGI in CC_JGI_lines[1:]:
+        CC_JGI_Cols = CC_JGI.strip().split()
+        MSTRG_ID = CC_JGI_Cols[3]
+        if MSTRG_ID in JGI_Quotesgone_dict:
+            CC_JGI_Values = JGI_Quotesgone_dict[MSTRG_ID]
+            CC_JGI_Protein_ids = ";".join([value for value in CC_JGI_Values])
+            CC_JGI_Line_to_print = "\t".join([CC_JGI_Protein_ids] + CC_JGI_Cols) + "\n"
+            Copci_JGI_duplicated.write(CC_JGI_Line_to_print)
+    CC_21_header=CC_21_count.readline()
+    CC_21_lines=CC_21_count.readlines()
+    Copci_2021_duplicated.write("Protein_id" + "\t" + CC_21_header)
+    for CC_21 in CC_21_lines[1:]:
+        CC_21_Cols = CC_21.strip().split()
+        MSTRG_ID_21 = CC_21_Cols[3]
+        if MSTRG_ID_21 in Copci_2021_quotesgone_dict:
+            CC_2021_Values = Copci_2021_quotesgone_dict[MSTRG_ID_21]
+            CC_21_Protein_ids = ";".join([value_21 for value_21 in CC_2021_Values])
+            CC_21_Line_to_print = "\t".join([CC_21_Protein_ids] + CC_21_Cols) + "\n"
+            Copci_2021_duplicated.write(CC_21_Line_to_print)
+
+
+
+
+
+####13/08
+#I will not attempt to modify the GO_IDs, such that, rather than representing different, duplicated data.
+#they will instead be part of clustered together, based off what other copci/CC21 have been joined
+def Process_annotation_line(line):
+    fields = line.strip().split("\t")
+    if len(fields) > 1:
+        protein_id = fields[0]
+        protein_id = protein_id.replace("jgi|", '')
+        go_terms = fields[1:]
+        return protein_id, go_terms
+    else:
+        return None, []
+
+def main():
+    protein_mapping_both_CC21_and_JGI = {}
+    with open("GO_Ids/Combined_Goids_2021_jgi.assoc", 'r') as Both_GO_IDs, \
+            open("Test", "w") as output_file:
+        # Build the protein mapping from Combined_GO_IDs
+        for line in Both_GO_IDs:
+            protein_id, go_terms = Process_annotation_line(line)
+            if protein_id:
+                protein_mapping_both_CC21_and_JGI[protein_id] = go_terms
+
+        with open("GO_Ids/Joined_semicols_CC21_JGI", 'r') as Joined_prot:
+            for line in Joined_prot:
+                line = line.strip() # including this, while preventative of .split()[0] stops it from working
+                keys = line.split(';')  # Split by semicolon
+                output_line = []
+                #print(keys) 14/08 issue resolved
+
+                for key in keys:
+                    protein_id, _ = Process_annotation_line(key + '\t')
+                    #print(protein_id)
+                    if protein_id and protein_id in protein_mapping_both_CC21_and_JGI:
+                        go_terms = protein_mapping_both_CC21_and_JGI[protein_id]
+                        output_line.extend(go_terms)
+                        #print(output_line) output is ['GO:0006468', 'GO:0005524', 'GO:0004674']
+
+                if output_line:
+                    if len(keys) > 1:
+                        # If multiple proteins, keep them as is
+                        output_file.write(';'.join(keys) + '\t' + '\t'.join(output_line) + '\n')
+                    else:
+                        output_file.write(keys[0] + '\t' + '\t'.join(output_line) + '\n')
+                else:
+                    output_file.write(line + '\n')
+
+if __name__ == "__main__":
+    main()
+
+with open("Test", 'r') as removing_unwanted_col, open("Test_1", "w") as output:
+    for line in removing_unwanted_col:
+        fields=line.strip().split('\t')
+        newline='\t'.join(fields[:1] + fields[30:])
+        output.write(newline + '\n')
