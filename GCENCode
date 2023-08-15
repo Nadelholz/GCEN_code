@@ -237,3 +237,27 @@ with open("Test", 'r') as removing_unwanted_col, open("Test_1", "w") as output:
         fields=line.strip().split('\t')
         newline='\t'.join(fields[:1] + fields[30:])
         output.write(newline + '\n')
+
+
+
+####Linux, substituting 
+
+sed 's/;/_/g' Test_1 > GO_Ids_Isoformsjoined.assoc
+sed 's/;/_/g' Joined_semicols_CC21_JGI > Countdata_JGI_CC21_semicols_subbed
+
+
+
+
+
+../bin/data_norm -i Countdata_JGI_CC21_semicols_subbed -o Countdata_JGI_CC21_semicols_subbed_Norm.tsv -m deseq
+../bin/data_filter -i Countdata_JGI_CC21_semicols_subbed_Norm.tsv -o Countdata_JGI_CC21_semicols_subbed_Norm_Filtererd.tsv -p 0.75
+../bin/network_build -i Countdata_JGI_CC21_semicols_subbed_Norm_Filtererd.tsv -o Countdata_JGI_CC21_semicols_subbed.network -m spearman -p 0.001 -c 0.8 -f -t 6
+../bin/module_identify -i Countdata_JGI_CC21_semicols_subbed.network -o CC21_JGI_semicoljoined_module.txt -s 0.5 -t 6
+
+
+../bin/annotate -g ../David_data/go-basic.obo -a GO_Ids_Isoformsjoined.assoc -n Countdata_JGI_CC21_semicols_subbed.network -o CC21_JGI_semicolsjoined_annotate
+
+
+
+
+
